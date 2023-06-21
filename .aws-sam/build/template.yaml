@@ -1,0 +1,140 @@
+Resources:
+  plot:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: plotNumber
+        AttributeType: S
+      - AttributeName: ownerName
+        AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+      - AttributeName: plotNumber
+        KeyType: HASH
+      - AttributeName: ownerName
+        KeyType: RANGE
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+  getPlotDetails:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description:
+        Fn::Sub:
+        - Stack ${AWS::StackName} Function ${ResourceName}
+        - ResourceName: getPlotDetails
+      CodeUri: getPlotDetails
+      Handler: handler.handler
+      Runtime: python3.9
+      MemorySize: 3008
+      Timeout: 30
+      Tracing: Active
+      FunctionUrlConfig:
+        AuthType: AWS_IAM
+        Cors:
+          AllowOrigins:
+          - '*'
+      Environment:
+        Variables:
+          PLOT_TABLE_NAME:
+            Ref: plot
+          PLOT_TABLE_ARN:
+            Fn::GetAtt:
+            - plot
+            - Arn
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: plot
+      Events:
+        ResidentialAssociationGETplotsplotNumber:
+          Type: Api
+          Properties:
+            Path: /plots/{plotNumber}/
+            Method: GET
+            RestApiId:
+              Ref: ResidentialAssociation
+    Metadata:
+      SamResourceId: getPlotDetails
+  getPlotDetailsLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/lambda/${getPlotDetails}
+  updatePlotDetails:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description:
+        Fn::Sub:
+        - Stack ${AWS::StackName} Function ${ResourceName}
+        - ResourceName: updatePlotDetails
+      CodeUri: updatePlotDetails
+      Handler: handler.handler
+      Runtime: python3.9
+      MemorySize: 3008
+      Timeout: 30
+      Tracing: Active
+      FunctionUrlConfig:
+        AuthType: AWS_IAM
+        Cors:
+          AllowOrigins:
+          - '*'
+      Environment:
+        Variables:
+          PLOT_TABLE_NAME:
+            Ref: plot
+          PLOT_TABLE_ARN:
+            Fn::GetAtt:
+            - plot
+            - Arn
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: plot
+      Events:
+        ResidentialAssociationPUTplots:
+          Type: Api
+          Properties:
+            Path: /plots/
+            Method: PUT
+            RestApiId:
+              Ref: ResidentialAssociation
+    Metadata:
+      SamResourceId: updatePlotDetails
+  updatePlotDetailsLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/lambda/${updatePlotDetails}
+  ResidentialAssociation:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name:
+        Fn::Sub:
+        - ${ResourceName} From Stack ${AWS::StackName}
+        - ResourceName: ResidentialAssociation
+      StageName: Prod
+      DefinitionBody:
+        openapi: '3.0'
+        info: {}
+        paths:
+          /plots/{plotNumber}/:
+            get:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri:
+                  Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${getPlotDetails.Arn}/invocations
+              responses: {}
+          /plots/:
+            put:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri:
+                  Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${updatePlotDetails.Arn}/invocations
+              responses: {}
+      EndpointConfiguration: REGIONAL
+      TracingEnabled: true
+Transform: AWS::Serverless-2016-10-31
